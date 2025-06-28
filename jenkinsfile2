@@ -1,0 +1,77 @@
+pipeline {
+    agent any
+
+    environment {
+        APP_ENV = 'production'
+        BUILD_DATE = "${new Date().format('yyyy-MM-dd')}"
+    }
+
+    options {
+        timeout(time: 20, unit: 'MINUTES')
+        buildDiscarder(logRotator(numToKeepStr: '3'))
+    }
+
+    parameters {
+        string(name: 'VERSION', defaultValue: '1.0.0', description: 'Versão da aplicação')
+        booleanParam(name: 'RUN_TESTS', defaultValue: true, description: 'Executar testes?')
+        choice(name: 'DEPLOY_ENV', choices: ['dev', 'staging', 'production'], description: 'Ambiente de deploy')
+    }
+
+    triggers {
+        pollSCM('H/15 * * * *') // Verificação de mudanças no repositório
+    }
+
+    stages {
+
+        stage('Build Matrix Simulada') {
+            steps {
+                script {
+                    def osList = ['linux', 'windows']
+                    def jdkList = ['jdk8', 'jdk11']
+
+                    for (os in osList) {
+                        for (jdk in jdkList) {
+                            echo "Compilando para sistema: ${os} com JDK: ${jdk}"
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Testes em Paralelo') {
+            when {
+                expression { return params.RUN_TESTS }
+            }
+            parallel {
+                stage('Unit Tests') {
+                    steps {
+                        echo "Executando testes unitários..."
+                    }
+                }
+                stage('Integration Tests') {
+                    steps {
+                        echo "Executando testes de integração..."
+                    }
+                }
+            }
+        }
+
+        stage('Deploy') {
+            steps {
+                echo "Deploy no ambiente ${params.DEPLOY_ENV} com versão ${params.VERSION}"
+            }
+        }
+    }
+
+    post {
+        success {
+            echo "Build finalizado com sucesso!"
+        }
+        failure {
+            echo "Build falhou!"
+        }
+        always {
+            echo "Data de execução: ${BUILD_DATE}"
+        }
+    }
+}
